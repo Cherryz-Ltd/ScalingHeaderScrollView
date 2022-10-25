@@ -103,45 +103,47 @@ public struct ScalingHeaderScrollView<Header: View, Content: View>: View {
     // MARK: - Body builder
     
     public var body: some View {
-        ScrollView(showsIndicators: showsIndicators) {
-            content
-                .offset(y: contentOffset)
-                .frameGetter($contentFrame.frame)
-                .onChange(of: contentFrame.frame) { frame in
-                    isSpinning = frame.minY > 20.0
-                }
-                .onChange(of: scrollToTop) { value in
-                    if value {
-                        scrollToTop = false
-                        setScrollPositionToTop()
+        GeometryReader { outerGeometry in
+            ScrollView(showsIndicators: showsIndicators) {
+                content
+                    .offset(y: contentOffset)
+                    .frameGetter($contentFrame.frame)
+                    .onChange(of: contentFrame.frame) { frame in
+                        isSpinning = frame.minY > 20.0
                     }
-                }
-            
-            GeometryReader { geometry in
-                ZStack(alignment: .topLeading) {
-                    if needToShowProgressView {
-                        ProgressView()
-                            .progressViewStyle(CircularProgressViewStyle())
-                            .frame(width: UIScreen.main.bounds.width, height: getHeightForLoadingView())
-                            .scaleEffect(1.25)
-                            .offset(y: getOffsetForHeader() + progressViewOffset)
+                    .onChange(of: scrollToTop) { value in
+                        if value {
+                            scrollToTop = false
+                            setScrollPositionToTop()
+                        }
                     }
-                    
-                    header
-                        .frame(height: headerHeight)
-                        .clipped()
-                        .offset(y: getOffsetForHeader())
-                        .allowsHitTesting(true)
-                        .scaleEffect(headerScaleOnPullDown)
+
+                GeometryReader { innerGeometry in
+                    ZStack(alignment: .topLeading) {
+                        if needToShowProgressView {
+                            ProgressView()
+                                .progressViewStyle(CircularProgressViewStyle())
+                                .frame(width: UIScreen.main.bounds.width, height: getHeightForLoadingView())
+                                .scaleEffect(1.25)
+                                .offset(y: getOffsetForHeader() + progressViewOffset)
+                        }
+
+                        header
+                            .frame(height: headerHeight)
+                            .clipped()
+                            .offset(y: getOffsetForHeader())
+                            .allowsHitTesting(true)
+                            .scaleEffect(headerScaleOnPullDown)
+                    }
+                    .offset(y: getGeometryReaderVsScrollView(innerGeometry, outerGeometry))
                 }
-                .offset(y: getGeometryReaderVsScrollView(geometry))
+                .background(Color.clear)
+                .frame(height: maxHeight)
+                .offset(y: -(contentFrame.startingRect?.maxY ?? UIScreen.main.bounds.height))
             }
-            .background(Color.clear)
-            .frame(height: maxHeight)
-            .offset(y: -(contentFrame.startingRect?.maxY ?? UIScreen.main.bounds.height))
-        }
-        .introspectScrollView { scrollView in
-            configure(scrollView: scrollView)
+            .introspectScrollView { scrollView in
+                configure(scrollView: scrollView)
+            }
         }
     }
     
@@ -188,8 +190,8 @@ public struct ScalingHeaderScrollView<Header: View, Content: View>: View {
         -(uiScrollView?.contentOffset.y ?? 0)
     }
     
-    private func getGeometryReaderVsScrollView(_ geometry: GeometryProxy) -> CGFloat {
-        getScrollOffset() - geometry.frame(in: .global).minY
+    private func getGeometryReaderVsScrollView(_ inner: GeometryProxy, _ outer: GeometryProxy) -> CGFloat {
+        return getScrollOffset() - (inner.frame(in: .global).minY - outer.frame(in: .global).minY)
     }
     
     private func getOffsetForHeader() -> CGFloat {
